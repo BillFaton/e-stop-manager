@@ -24,7 +24,28 @@ cd e-stop-manager
 
 # Install dependencies (uv will create a virtual environment automatically)
 uv add gpiozero click
+
+# For Raspberry Pi 5 - Install lgpio for optimal performance
+uv add lgpio
 ```
+
+### Raspberry Pi 5 Optimization
+
+For the best performance on Raspberry Pi 5, install the lgpio backend:
+
+```bash
+# On Raspberry Pi 5, you may need to install system dependencies first
+sudo apt update
+sudo apt install swig python3-dev
+
+# Then install lgpio for optimal GPIO performance
+uv add lgpio
+```
+
+The e-stop manager automatically detects and uses the lgpio backend when available, providing:
+- Better performance and lower latency
+- More reliable GPIO operations  
+- Improved compatibility with Pi 5 hardware
 
 ## CLI Usage
 

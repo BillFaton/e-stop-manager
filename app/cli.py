@@ -88,6 +88,16 @@ def status(ctx):
     click.echo(f"Mode: {status['mode'].upper()} ({'Normally Closed' if status['mode'] == 'nc' else 'Normally Open'})")
     click.echo(f"Manual Override: {status['manual_override']}")
     click.echo(f"GPIO Available: {status['gpio_available']}")
+    click.echo()
+    click.echo("System Information")
+    click.echo("-" * 18)
+    click.echo(f"Platform: {status['pi_model']}")
+    click.echo(f"GPIO Backend: {status['gpio_backend']}")
+    
+    if status.get('pi5_optimized'):
+        click.echo(click.style("✓ Pi 5 Optimized (lgpio backend active)", fg='green'))
+    elif 'Raspberry Pi 5' in status['pi_model']:
+        click.echo(click.style("⚠ Pi 5 detected but not optimized (install lgpio)", fg='yellow'))
     
     if not status['gpio_available']:
         click.echo(click.style("⚠ Warning: GPIO not available (simulation mode)", fg='yellow'))

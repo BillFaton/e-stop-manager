@@ -5,9 +5,19 @@ import json
 import os
 from pathlib import Path
 from typing import Optional
-from gpiozero import DigitalInputDevice, DigitalOutputDevice
+from gpiozero import DigitalInputDevice, DigitalOutputDevice, Device
 from enum import Enum
 import logging
+import platform
+
+# Pi 5 optimization: Prefer lgpio backend for better performance
+try:
+    from gpiozero.pins.lgpio import LGPIOFactory
+    Device.pin_factory = LGPIOFactory()
+    _PI5_OPTIMIZED = True
+except ImportError:
+    # Fallback to default pin factory
+    _PI5_OPTIMIZED = False
 
 logger = logging.getLogger(__name__)
 
@@ -185,13 +195,33 @@ class EStopManager:
         current_state = self.get_estop_state()
         gpio_state = self._read_gpio_state()
         
+        # Detect Pi model for optimization info
+        pi_model = "Unknown"
+        try:
+            with open('/proc/cpuinfo', 'r') as f:
+                cpuinfo = f.read()
+                if 'BCM2712' in cpuinfo:  # Pi 5 processor
+                    pi_model = "Raspberry Pi 5"
+                elif 'BCM2711' in cpuinfo:  # Pi 4 processor  
+                    pi_model = "Raspberry Pi 4"
+                elif 'BCM' in cpuinfo:
+                    pi_model = "Raspberry Pi (older model)"
+        except:
+            if platform.system() == "Darwin":
+                pi_model = "macOS (simulation)"
+            else:
+                pi_model = "Non-Pi system"
+        
         return {
             'estop_state': current_state.value,
             'gpio_pin': self.gpio_pin,
             'gpio_active': gpio_state,
             'mode': self.mode.value,
             'manual_override': self._manual_override,
-            'gpio_available': self._gpio_device is not None
+            'gpio_available': self._gpio_device is not None,
+            'pi_model': pi_model,
+            'pi5_optimized': _PI5_OPTIMIZED,
+            'gpio_backend': str(type(Device.pin_factory).__name__) if Device.pin_factory else "None"
         }
     
     def cleanup(self):
