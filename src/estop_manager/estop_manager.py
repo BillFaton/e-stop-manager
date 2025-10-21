@@ -5,21 +5,51 @@ import json
 import os
 from pathlib import Path
 from typing import Optional
-from gpiozero import DigitalInputDevice, DigitalOutputDevice, Device
 from enum import Enum
 import logging
 import platform
-
-# Pi 5 optimization: Prefer lgpio backend for better performance
-try:
-    from gpiozero.pins.lgpio import LGPIOFactory
-    Device.pin_factory = LGPIOFactory()
-    _PI5_OPTIMIZED = True
-except ImportError:
-    # Fallback to default pin factory
-    _PI5_OPTIMIZED = False
+import traceback
 
 logger = logging.getLogger(__name__)
+
+# Log module initialization
+logger.info("=== EStopManager Module Initializing ===")
+
+# Import GPIO libraries with detailed logging
+try:
+    logger.info("Importing gpiozero...")
+    from gpiozero import DigitalInputDevice, DigitalOutputDevice, Device
+    logger.info("✓ gpiozero imported successfully")
+except ImportError as e:
+    logger.error(f"✗ Failed to import gpiozero: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    raise ImportError(f"gpiozero import failed: {e}") from e
+except Exception as e:
+    logger.error(f"✗ Unexpected error importing gpiozero: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    raise
+
+# Pi 5 optimization: Prefer lgpio backend for better performance
+logger.info("Attempting Pi 5 optimization with lgpio backend...")
+try:
+    logger.info("Importing LGPIOFactory...")
+    from gpiozero.pins.lgpio import LGPIOFactory
+    logger.info("✓ LGPIOFactory imported successfully")
+    
+    logger.info("Setting LGPIOFactory as pin factory...")
+    Device.pin_factory = LGPIOFactory()
+    _PI5_OPTIMIZED = True
+    logger.info("✓ Pi 5 optimization successful - lgpio backend active")
+except ImportError as e:
+    logger.warning(f"⚠ lgpio not available: {e}")
+    logger.info("Falling back to default pin factory")
+    _PI5_OPTIMIZED = False
+except Exception as e:
+    logger.warning(f"⚠ Unexpected error setting up lgpio: {e}")
+    logger.info("Falling back to default pin factory")
+    _PI5_OPTIMIZED = False
+
+logger.info(f"GPIO backend initialization complete. Pi5 optimized: {_PI5_OPTIMIZED}")
 
 
 class EStopMode(Enum):
@@ -47,28 +77,51 @@ class EStopManager:
             mode: E-stop mode (NC or NO, default: NC for safety)
             config_file: Optional config file path for persistence
         """
+        logger.info(f"=== EStopManager.__init__ called ===")
+        logger.info(f"Parameters: gpio_pin={gpio_pin}, mode={mode}, config_file={config_file}")
+        
         self.gpio_pin = gpio_pin
         self.mode = mode
         self.config_file = config_file or str(Path.home() / ".estop_config.json")
+        logger.info(f"Config file path: {self.config_file}")
         
         # Initialize GPIO
         self._gpio_device = None
         self._current_state = EStopState.INACTIVE
         self._manual_override = False
+        logger.info("Initial state variables set")
         
         # Load saved configuration
+        logger.info("Loading saved configuration...")
         self._load_config()
         
         # Initialize GPIO device
+        logger.info("Initializing GPIO device...")
         self._init_gpio()
+        
+        logger.info(f"✓ EStopManager initialization complete")
+        logger.info(f"Final state: gpio_pin={self.gpio_pin}, mode={self.mode.value}, gpio_device={'Available' if self._gpio_device else 'None'}")
     
     def _init_gpio(self):
-        """Initialize GPIO device"""
+        """Initialize GPIO device as output for software e-stop control"""
+        logger.info(f"Attempting to initialize GPIO pin {self.gpio_pin} as OUTPUT")
+        logger.info(f"Current pin factory: {type(Device.pin_factory).__name__ if Device.pin_factory else 'None'}")
+        
         try:
-            self._gpio_device = DigitalInputDevice(self.gpio_pin, pull_up=True)
-            logger.info(f"GPIO pin {self.gpio_pin} initialized successfully")
+            logger.info("Creating DigitalOutputDevice...")
+            self._gpio_device = DigitalOutputDevice(self.gpio_pin)
+            logger.info(f"✓ GPIO pin {self.gpio_pin} initialized successfully as output")
+            logger.info(f"GPIO device type: {type(self._gpio_device)}")
+            
+            # Set initial state based on current e-stop state
+            self._update_gpio_output()
+            logger.info("Initial GPIO output state set")
+            
         except Exception as e:
-            logger.error(f"Failed to initialize GPIO pin {self.gpio_pin}: {e}")
+            logger.error(f"✗ Failed to initialize GPIO pin {self.gpio_pin}: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.warning("Setting GPIO device to None (simulation mode)")
             # For testing without actual GPIO hardware
             self._gpio_device = None
     
@@ -98,11 +151,42 @@ class EStopManager:
         except Exception as e:
             logger.error(f"Could not save config: {e}")
     
-    def _read_gpio_state(self) -> bool:
-        """Read current GPIO state"""
+    def _update_gpio_output(self):
+        """Update GPIO output based on current e-stop state and mode"""
         if self._gpio_device is None:
-            # Simulate GPIO for testing
-            return not self._manual_override
+            logger.debug("No GPIO device available, skipping output update")
+            return
+        
+        try:
+            # Determine what the GPIO output should be
+            estop_active = self._manual_override or self._current_state == EStopState.ACTIVE
+            
+            if self.mode == EStopMode.NC:
+                # Normally Closed: Output HIGH when inactive, LOW when active (estop engaged)
+                gpio_output = not estop_active
+            else:
+                # Normally Open: Output LOW when inactive, HIGH when active (estop engaged)  
+                gpio_output = estop_active
+            
+            # Set the GPIO output
+            if gpio_output:
+                self._gpio_device.on()
+                logger.debug(f"GPIO pin {self.gpio_pin} set to HIGH")
+            else:
+                self._gpio_device.off()
+                logger.debug(f"GPIO pin {self.gpio_pin} set to LOW")
+                
+        except Exception as e:
+            logger.error(f"Error updating GPIO output: {e}")
+
+    def _read_gpio_state(self) -> bool:
+        """Read current GPIO output state"""
+        if self._gpio_device is None:
+            # Simulate GPIO for testing - return state based on manual override
+            if self.mode == EStopMode.NC:
+                return not self._manual_override
+            else:
+                return self._manual_override
         
         try:
             return self._gpio_device.is_active
@@ -143,8 +227,9 @@ class EStopManager:
         try:
             self._manual_override = True
             self._current_state = EStopState.ACTIVE
+            self._update_gpio_output()  # Update GPIO output immediately
             self._save_config()
-            logger.info("E-stop manually activated")
+            logger.info("E-stop manually activated - GPIO output updated")
             return True
         except Exception as e:
             logger.error(f"Failed to activate e-stop: {e}")
@@ -159,8 +244,10 @@ class EStopManager:
         """
         try:
             self._manual_override = False
+            self._current_state = EStopState.INACTIVE
+            self._update_gpio_output()  # Update GPIO output immediately
             self._save_config()
-            logger.info("E-stop reset (manual override cleared)")
+            logger.info("E-stop reset (manual override cleared) - GPIO output updated")
             return True
         except Exception as e:
             logger.error(f"Failed to reset e-stop: {e}")
@@ -225,10 +312,38 @@ class EStopManager:
         }
     
     def cleanup(self):
-        """Clean up GPIO resources"""
+        """Clean up GPIO resources and set safe state"""
         if self._gpio_device:
             try:
+                # Before cleanup, set GPIO to safe state (e-stop active)
+                logger.info("Setting GPIO to safe state before cleanup...")
+                self._set_safe_state()
+                
+                # Brief delay to ensure state is set
+                import time
+                time.sleep(0.1)
+                
                 self._gpio_device.close()
-                logger.info("GPIO resources cleaned up")
+                logger.info("GPIO resources cleaned up after setting safe state")
             except Exception as e:
                 logger.error(f"Error during cleanup: {e}")
+    
+    def _set_safe_state(self):
+        """Set GPIO to safe state (e-stop active) for shutdown"""
+        if self._gpio_device is None:
+            logger.debug("No GPIO device available, skipping safe state setting")
+            return
+            
+        try:
+            # Safe state = e-stop active
+            if self.mode == EStopMode.NC:
+                # NC Mode: Safe state is LOW (e-stop active)
+                self._gpio_device.off()
+                logger.info("Set safe state: GPIO pin LOW (NC mode - e-stop active)")
+            else:
+                # NO Mode: Safe state is HIGH (e-stop active)  
+                self._gpio_device.on()
+                logger.info("Set safe state: GPIO pin HIGH (NO mode - e-stop active)")
+                
+        except Exception as e:
+            logger.error(f"Error setting safe state: {e}")

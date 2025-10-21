@@ -30,7 +30,7 @@ Usage as CLI:
     uv run python -m app monitor  # Monitor in real-time
 """
 
-from .estop_manager import EStopManager, EStopMode, EStopState
+from src.estop_manager import EStopManager, EStopMode, EStopState
 
 # Version info
 __version__ = "0.1.0"
