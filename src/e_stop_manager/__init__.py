@@ -5,7 +5,7 @@ This package provides core functionality for managing emergency stops
 using GPIO pins on Raspberry Pi or compatible single-board computers.
 """
 
-from .estop_manager import EStopManager, EStopMode, EStopState
+from .e_stop_manager import EStopManager, EStopMode, EStopState
 
 # Version info
 __version__ = "0.1.0"

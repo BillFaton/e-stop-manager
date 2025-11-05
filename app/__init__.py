@@ -30,7 +30,7 @@ Usage as CLI:
     uv run python -m app monitor  # Monitor in real-time
 """
 
-from src.estop_manager import EStopManager, EStopMode, EStopState
+from src.e_stop_manager import EStopManager, EStopMode, EStopState
 
 # Version info
 __version__ = "0.1.0"
@@ -45,7 +45,7 @@ __all__ = [
 ]
 
 # Convenience functions for quick library usage
-def create_estop_manager(gpio_pin: int = 4, mode: EStopMode = EStopMode.NC) -> EStopManager:
+def create_e_stop_manager(gpio_pin: int = 4, mode: EStopMode = EStopMode.NC) -> EStopManager:
     """
     Create and return an EStopManager instance with common defaults
     
@@ -112,7 +112,7 @@ def quick_reset_estop(gpio_pin: int = 4) -> bool:
 
 # Add convenience functions to __all__
 __all__.extend([
-    "create_estop_manager",
+    "create_e_stop_manager",
     "quick_estop_status", 
     "quick_activate_estop",
     "quick_reset_estop"

@@ -150,10 +150,10 @@ success = quick_reset_estop(gpio_pin=4)
 ### Advanced Usage
 
 ```python
-from app import create_estop_manager, EStopMode
+from app import create_e_stop_manager, EStopMode
 
 # Create with custom configuration
-estop = create_estop_manager(gpio_pin=18, mode=EStopMode.NO)
+estop = create_e_stop_manager(gpio_pin=18, mode=EStopMode.NO)
 
 # Monitor state changes
 import time
@@ -225,7 +225,7 @@ e-stop-manager/
 │   ├── __init__.py          # Library exports and convenience functions
 │   ├── __main__.py          # Module entry point
 │   ├── cli.py               # CLI interface with Click
-│   └── estop_manager.py     # Core e-stop logic
+│   └── e_stop_manager.py     # Core e-stop logic
 ├── pyproject.toml           # Project configuration
 ├── uv.lock                  # Dependency lock file
 └── README.md                # This file

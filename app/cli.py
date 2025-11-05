@@ -26,7 +26,7 @@ logger.info("=== E-Stop Manager CLI Starting ===")
 # Import with error handling
 try:
     logger.info("Importing EStopManager components...")
-    from src.estop_manager import EStopManager, EStopMode, EStopState
+    from src.e_stop_manager import EStopManager, EStopMode, EStopState
     logger.info("✓ Successfully imported EStopManager components")
 except ImportError as e:
     logger.error(f"✗ Failed to import EStopManager: {e}")
@@ -104,11 +104,11 @@ def cli(ctx, gpio_pin, verbose, debug):
     
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
-        logging.getLogger('app.estop_manager').setLevel(logging.DEBUG)
+        logging.getLogger('app.e_stop_manager').setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled")
     elif verbose:
         logging.getLogger().setLevel(logging.INFO)
-        logging.getLogger('app.estop_manager').setLevel(logging.INFO)
+        logging.getLogger('app.e_stop_manager').setLevel(logging.INFO)
         logger.info("Verbose logging enabled")
     
     # Store parameters in context for subcommands

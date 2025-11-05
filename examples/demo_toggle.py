@@ -17,7 +17,7 @@ import signal
 import sys
 import argparse
 from datetime import datetime
-from app.estop_manager import EStopManager, EStopMode, EStopState
+from app.e_stop_manager import EStopManager, EStopMode, EStopState
 
 # Global manager for cleanup
 manager = None
